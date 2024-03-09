@@ -1,0 +1,8 @@
+[package]
+name = "graph"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+irontraits.workspace = true
+ironstructs.workspace = true

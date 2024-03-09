@@ -1,0 +1,17 @@
+[workspace]
+resolver = "2"
+members = [
+    "irontraits",
+    "irongraph", "irongraph/graph", "irongraph/csr",
+    "ironstructs", "ironstructs/ranger", "ironstructs/custom_iters",
+]
+
+[workspace.dependencies]
+epserde = "0.4.1"
+irontraits = {path = "irontraits"}
+irongraph = {path = "irongraph"}
+ironstructs = {path = "ironstructs"}
+graph = {path = "irongraph/graph"}
+csr = {path = "irongraph/csr"}
+ranger = {path = "ironstructs/ranger"}
+custom_iters = {path = "ironstructs/custom_iters"}

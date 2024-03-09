@@ -1,0 +1,30 @@
+[package]
+name = "csr-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+#libfuzzer-sys = "0.4"
+libfuzzer-sys = { version = "*", package = "libafl_libfuzzer", features = ["introspection"], git = "https://github.com/AFLplusplus/LibAFL", branch="libfuzzer-best"}
+arbitrary = { version = "1", features = ["derive"] }
+rayon = "1.8"
+
+[dependencies.csr]
+path = ".."
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]
+
+[profile.release]
+debug = 1
+
+[[bin]]
+name = "iter"
+path = "fuzz_targets/iter.rs"
+test = false
+doc = false

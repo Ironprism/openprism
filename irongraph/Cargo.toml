@@ -1,0 +1,9 @@
+[package]
+name = "irongraph"
+version = "0.1.0"
+edition = "2021"
+description = "This is a Facade that exports all the subcrates of this repository"
+
+[dependencies]
+graph.workspace = true
+csr.workspace = true

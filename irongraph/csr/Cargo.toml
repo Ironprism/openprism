@@ -1,0 +1,18 @@
+[package]
+name = "csr"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+graph.workspace = true
+irontraits.workspace = true
+ironstructs.workspace = true
+epserde.workspace = true
+rayon = {version ="1.8", optional = true}
+
+[features]
+default = ["std", "rayon"]
+std = []
+
+[dev-dependencies]
+rand = {version = "0.8.5", features = ["small_rng"]}
