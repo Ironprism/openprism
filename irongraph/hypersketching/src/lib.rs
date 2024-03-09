@@ -37,7 +37,6 @@ pub struct HyperSketching<G, Data, Counters, P = Precision12, const BITS: usize 
 where
     P: Precision + WordType<BITS>,
     Counters: Sequence<Item = HyperLogLog<P, BITS>>,
-    Data: AsRef<HyperSketchingData<Counters>>,
 {
     /// The portion of hypersketching that can be serialized and deserialized
     data: Data,
@@ -209,6 +208,24 @@ where
     fn deleted(&self) -> usize {
         self.not_visited() - 1
     }
+
+    #[inline(always)]
+    pub fn normalize(&self) -> bool {
+        self.data.as_ref().normalize
+    }
+}
+
+impl<G, Data, Counters, P, const BITS: usize> HyperSketching<G, Data, Counters, P, BITS>
+where
+    G: Graph,
+    Counters: Sequence<Item = HyperLogLog<P, BITS>>,
+    P: Precision + WordType<BITS>,
+    Data: AsMut<HyperSketchingData<Counters>>,
+{
+    #[inline(always)]
+    pub fn set_normalize(&mut self, normalize: bool) {
+        self.data.as_mut().normalize = normalize;
+    }
 }
 
 impl<G, Data, Counters, P, const BITS: usize> HyperSketching<G, Data, Counters, P, BITS>
@@ -376,6 +393,51 @@ where
     P: Precision + WordType<BITS>,
     Data: AsRef<HyperSketchingData<Counters>> + AsMut<HyperSketchingData<Counters>>,
 {
+
+    #[inline(always)]
+    pub fn biased_edge_features<const INSERT_EDGE: bool>(
+        &self,
+        (src, dst): (G::Node, G::Node),
+        target: &mut [f32],
+    ) {
+        // We get the usize representation of the nodes.
+        let src: usize = src.to();
+        let dst: usize = dst.to();
+
+        // Now, we can compute the overlap matrix.
+        if self.normalize() {
+            let (overlaps, left_diffs, right_diffs) = <HyperLogLog<P, BITS> as HyperSpheresSketch<f32>>::normalized_overlap_and_differences_cardinality_matrices_vec(
+                &self.data.as_ref().counters.as_ref()[src * self.number_of_hops()..(src + 1) * self.number_of_hops()],
+                &self.data.as_ref().counters.as_ref()[dst * self.number_of_hops()..(dst + 1) * self.number_of_hops()],
+            );
+            target
+            .iter_mut()
+            .zip(
+                overlaps
+                    .into_iter()
+                    .flat_map(|o| o)
+                    .chain(left_diffs)
+                    .chain(right_diffs),
+            )
+            .for_each(|(t, v)| *t = v);
+        } else {
+            let (overlaps, left_diffs, right_diffs) = <HyperLogLog<P, BITS> as HyperSpheresSketch<f32>>::overlap_and_differences_cardinality_matrices_vec(
+                &self.data.as_ref().counters.as_ref()[src * self.number_of_hops()..(src + 1) * self.number_of_hops()],
+                &self.data.as_ref().counters.as_ref()[dst * self.number_of_hops()..(dst + 1) * self.number_of_hops()],
+            );
+            target
+            .iter_mut()
+            .zip(
+                overlaps
+                    .into_iter()
+                    .flat_map(|o| o)
+                    .chain(left_diffs)
+                    .chain(right_diffs),
+            )
+            .for_each(|(t, v)| *t = v.round());
+        };
+    }
+
     #[inline(always)]
     pub fn bias_aware_edge_features<const INSERT_EDGE: bool>(
         &self,
