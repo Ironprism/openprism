@@ -36,11 +36,28 @@ impl<T> SequenceLen for Vec<T> {
 
 impl<T> SequenceAllocable for Vec<T> {
     #[inline(always)]
+    fn defaulted(len: usize) -> Self 
+    where
+        Self::Item: Default
+    {
+        let mut res = Vec::with_capacity(len);
+        for _ in 0..len {
+            res.push(Self::Item::default());
+        }
+        res
+    }
+
+    #[inline(always)]
     unsafe fn uninitialized(len: usize) -> Self {
         let mut res = Vec::with_capacity(len);
         #[allow(clippy::uninit_vec)]
         res.set_len(len);
         res
+    }
+
+    #[inline(always)]
+    fn empty() -> Self {
+        Vec::new()
     }
 }
 

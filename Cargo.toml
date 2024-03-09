@@ -2,16 +2,22 @@
 resolver = "2"
 members = [
     "irontraits",
-    "irongraph", "irongraph/graph", "irongraph/csr",
-    "ironstructs", "ironstructs/ranger", "ironstructs/custom_iters",
+    "irongraph", "irongraph/graph", "irongraph/csr", "irongraph/hypersketching",
+    "ironstructs", "ironstructs/ranger", "ironstructs/custom_iters", "ironstructs/par_replica",
 ]
 
 [workspace.dependencies]
 epserde = "0.4.1"
+hyperloglog-rs = {git = "https://github.com/LucaCappelletti94/hyperloglog-rs.git", features = ["std"]}
+sux = {git = "https://github.com/vigna/sux-rs.git"}
+anyhow = { version = "1.0", default-features = false }
+
 irontraits = {path = "irontraits"}
 irongraph = {path = "irongraph"}
 ironstructs = {path = "ironstructs"}
 graph = {path = "irongraph/graph"}
 csr = {path = "irongraph/csr"}
+hypersketching = {path = "irongraph/hypersketching"}
 ranger = {path = "ironstructs/ranger"}
 custom_iters = {path = "ironstructs/custom_iters"}
+par_replica = {path = "ironstructs/par_replica"}

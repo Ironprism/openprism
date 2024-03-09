@@ -22,3 +22,8 @@ mod sequence_alloc;
 
 mod to;
 pub use to::*;
+
+#[cfg(feature = "rayon")]
+mod rayon_traits;
+#[cfg(feature = "rayon")]
+pub use rayon_traits::IntoIndexedParallelIterator;

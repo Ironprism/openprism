@@ -17,6 +17,12 @@ pub trait SequenceMut: Sequence + IterMut {}
 
 pub trait SequenceAllocable: SequenceLen {
     unsafe fn uninitialized(len: usize) -> Self;
+
+    fn empty() -> Self;
+    
+    fn defaulted(len: usize) -> Self
+    where
+        Self::Item: Default;
 }
 
 pub trait SequenceRandomAccess: Sequence {

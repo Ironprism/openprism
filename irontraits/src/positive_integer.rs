@@ -1,4 +1,5 @@
-use core::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign};
+use core::{hash::Hash, ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign}};
+use crate::To;
 
 pub trait Zero {
     const ZERO: Self;
@@ -39,6 +40,8 @@ pub trait PositiveInteger:
     + DivAssign
     + Zero
     + One
+    + Hash
+    + To<usize>
 {
 }
 
@@ -61,5 +64,7 @@ impl<T> PositiveInteger for T where
         + DivAssign
         + Zero
         + One
+        + Hash
+        + To<usize>
 {
 }

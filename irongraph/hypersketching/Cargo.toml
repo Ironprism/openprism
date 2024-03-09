@@ -1,0 +1,15 @@
+[package]
+name = "hypersketching"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rayon = "1.8"
+
+hyperloglog-rs.workspace = true
+sux.workspace = true
+epserde.workspace = true
+irontraits = {workspace = true, features = ["rayon"]}
+graph.workspace = true
+par_replica = {workspace = true, features = ["rayon"]}
+anyhow.workspace = true
