@@ -12,6 +12,12 @@ pub trait Graph {
 
     type Nodes: IntoIterator<Item = Self::Node>;
     fn nodes(&self) -> Self::Nodes;
+
+    fn undirected(&self) -> bool {
+        !self.directed()
+    }
+    
+    fn directed(&self) -> bool;
 }
 
 pub trait Successors: Graph {

@@ -27,15 +27,23 @@ where
 {
     type Node = Destinations::Item;
 
+    #[inline(always)]
+    fn directed(&self) -> bool {
+        true
+    }
+
+    #[inline(always)]
     fn number_of_nodes(&self) -> usize {
         self.offsets.len() - 1
     }
 
+    #[inline(always)]
     fn number_of_edges(&self) -> usize {
         self.destinations.len()
     }
 
     type Nodes = Ranger<Destinations::Item>;
+    #[inline(always)]
     fn nodes(&self) -> Self::Nodes {
         Ranger::from_end(self.number_of_nodes().to())
     }
@@ -52,6 +60,7 @@ where
     where
         Self: 'a;
 
+        #[inline(always)]
     fn successors<N: Borrow<Self::Node>>(&self, node: N) -> Self::Successors<'_> {
         let node: usize = (*node.borrow()).to();
         let start = self.offsets.get(node).to();
@@ -59,6 +68,7 @@ where
         Copied::new(self.destinations[start..end].as_ref())
     }
 
+    #[inline(always)]
     fn has_successor<S: Borrow<Self::Node>, D: Borrow<Self::Node>>(&self, src: S, dst: D) -> bool {
         <[Destination]>::binary_search(self.successors(src).as_ref(), dst.borrow()).is_ok()
     }
@@ -75,6 +85,7 @@ where
     where
         Self: 'a;
 
+    #[inline(always)]
     fn successors<N: Borrow<Self::Node>>(&self, node: N) -> Self::Successors<'_> {
         let node: usize = (*node.borrow()).to();
         let start = self.offsets.get(node).to();
@@ -82,6 +93,7 @@ where
         Copied::new(self.destinations[start..end].as_ref())
     }
 
+    #[inline(always)]
     fn has_successor<S: Borrow<Self::Node>, D: Borrow<Self::Node>>(&self, src: S, dst: D) -> bool {
         <[Destination]>::binary_search(self.successors(src).as_ref(), dst.borrow()).is_ok()
     }

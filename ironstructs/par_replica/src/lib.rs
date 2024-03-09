@@ -36,6 +36,7 @@ impl<T> SyncUnsafeCell<T> {
     }
 
     #[inline(always)]
+    #[allow(clippy::mut_from_ref)]
     unsafe fn get_mut(&self) -> &mut T {
         unsafe { &mut *self.0.get() }
     }
@@ -62,6 +63,7 @@ where
     /// Returns a mutable reference to the replica corresponding to the current
     /// thread.
     #[inline(always)]
+    #[allow(clippy::mut_from_ref)]
     pub unsafe fn get_mut_by_id(&self, thread_id: usize) -> &mut T {
         &mut self.replicas.get_mut()[thread_id]
     }
@@ -92,6 +94,7 @@ where
     /// thread.
     #[inline(always)]
     #[cfg(feature = "rayon")]
+    #[allow(clippy::mut_from_ref)]
     pub unsafe fn get_mut(&self) -> &mut T {
         self.get_mut_by_id(self.current_thread_index())
     }

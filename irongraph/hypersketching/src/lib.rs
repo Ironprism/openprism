@@ -1,20 +1,17 @@
 use anyhow::{ensure, Context, Result};
-use core::hash::Hash;
+use core::hash::{Hash, Hasher};
 use epserde::{
-    deser::{DeserType, Deserialize, DeserializeInner, MemCase},
+    deser::{Deserialize, DeserializeInner, MemCase},
     traits::TypeHash,
     Epserde,
 };
 use graph::{Graph, Successors};
 use hyperloglog_rs::prelude::*;
-use irontraits::{
-    IntoIndexedParallelIterator, Sequence, SequenceAllocable, SequenceMut, SequenceRandomAccess,
-    SequenceRandomAccessMut, To,
-};
+use irontraits::{IntoIndexedParallelIterator, Sequence, SequenceAllocable, To};
 use par_replica::ParReplica;
 use rayon::prelude::*;
 use std::{marker::PhantomData, path::Path};
-use sux::prelude::BitFieldVec;
+use sux::prelude::{BitFieldSlice, BitFieldSliceMut, BitFieldVec};
 
 #[derive(Debug, Clone, Epserde)]
 pub struct HyperSketchingData<Counters> {
@@ -55,7 +52,7 @@ where
 impl<G, Counters, P, const BITS: usize>
     HyperSketching<G, HyperSketchingData<Counters>, Counters, P, BITS>
 where
-    G: Graph,
+    G: Graph + Hash,
     Counters: SequenceAllocable<Item = HyperLogLog<P, BITS>>,
     P: Precision + WordType<BITS>,
 {
@@ -94,7 +91,12 @@ where
     {
         if check_graph_hash {
             if let Some(graph_hash) = data.as_ref().graph_hash {
-                todo!();
+                let mut hasher = std::collections::hash_map::DefaultHasher::new();
+                graph.hash(&mut hasher);
+                ensure!(
+                    graph_hash == hasher.finish(),
+                    "The graph hash does not match the provided graph."
+                );
             }
         }
 
@@ -110,7 +112,7 @@ where
 impl<G, Counters, P, const BITS: usize>
     HyperSketching<G, HyperSketchingData<Counters>, Counters, P, BITS>
 where
-    G: Graph,
+    G: Graph + Hash,
     Counters: SequenceAllocable<Item = HyperLogLog<P, BITS>> + Deserialize + TypeHash,
     P: Precision + WordType<BITS>,
 {
@@ -132,28 +134,22 @@ where
     }
 }
 
+type DeserType<Counters> =
+    MemCase<<HyperSketchingData<Counters> as DeserializeInner>::DeserType<'static>>;
+
 impl<G, Counters, P, const BITS: usize>
     HyperSketching<G, HyperSketchingData<Counters>, Counters, P, BITS>
 where
-    G: Graph,
+    G: Graph + Hash,
     Counters: SequenceAllocable<Item = HyperLogLog<P, BITS>> + Deserialize + TypeHash,
     P: Precision + WordType<BITS>,
-    MemCase<<HyperSketchingData<Counters> as DeserializeInner>::DeserType<'static>>:
-        AsRef<HyperSketchingData<Counters>>,
+    DeserType<Counters>: AsRef<HyperSketchingData<Counters>>,
 {
     pub unsafe fn mmap<PP>(
         path: PP,
         graph: G,
         check_graph_hash: bool,
-    ) -> Result<
-        HyperSketching<
-            G,
-            MemCase<<HyperSketchingData<Counters> as DeserializeInner>::DeserType<'static>>,
-            Counters,
-            P,
-            BITS,
-        >,
-    >
+    ) -> Result<HyperSketching<G, DeserType<Counters>, Counters, P, BITS>>
     where
         PP: AsRef<Path>,
     {
@@ -282,4 +278,267 @@ where
     }
 }
 
+#[derive(Debug, Clone)]
+struct Normalized {
+    left_cardinality: Vec<f32>,
+    right_cardinality: Vec<f32>,
+}
 
+#[derive(Debug, Clone)]
+struct NotNormalized;
+
+trait Normalizer {
+    fn new(number_of_hops: usize) -> Self;
+
+    fn inc_left_cardinality(&mut self, hop: usize, inc: f32);
+    fn inc_right_cardinality(&mut self, hop: usize, inc: f32);
+
+    fn normalize(
+        &mut self,
+        intersections: &mut [f32],
+        left_difference: &mut [f32],
+        right_difference: &mut [f32],
+    );
+}
+
+impl Normalizer for Normalized {
+    #[inline(always)]
+    fn new(number_of_hops: usize) -> Self {
+        Self {
+            left_cardinality: vec![0.0; number_of_hops],
+            right_cardinality: vec![0.0; number_of_hops],
+        }
+    }
+
+    #[inline(always)]
+    fn inc_left_cardinality(&mut self, hop: usize, inc: f32) {
+        self.left_cardinality[hop] += inc;
+    }
+
+    #[inline(always)]
+    fn inc_right_cardinality(&mut self, hop: usize, inc: f32) {
+        self.right_cardinality[hop] += inc;
+    }
+
+    #[inline(always)]
+    fn normalize(
+        &mut self,
+        intersections: &mut [f32],
+        left_difference: &mut [f32],
+        right_difference: &mut [f32],
+    ) {
+        let hops = self.left_cardinality.len();
+        for i in 0..hops {
+            let mut current_left_difference = left_difference[i];
+            for j in (0..hops).rev() {
+                let non_normalized_differential_intersection = intersections[i * hops + j];
+                intersections[i * hops + j] /=
+                    (current_left_difference + self.right_cardinality[j]).max(f32::EPSILON);
+                current_left_difference += non_normalized_differential_intersection;
+            }
+            left_difference[i] /= self.left_cardinality[i].max(f32::EPSILON);
+            right_difference[i] /= self.right_cardinality[i].max(f32::EPSILON);
+        }
+    }
+}
+
+impl Normalizer for NotNormalized {
+    #[inline(always)]
+    fn new(_number_of_hops: usize) -> Self {
+        Self
+    }
+
+    #[inline(always)]
+    fn inc_left_cardinality(&mut self, _hop: usize, _inc: f32) {}
+
+    #[inline(always)]
+    fn inc_right_cardinality(&mut self, _hop: usize, _inc: f32) {}
+
+    #[inline(always)]
+    fn normalize(
+        &mut self,
+        _intersections: &mut [f32],
+        _left_difference: &mut [f32],
+        _right_difference: &mut [f32],
+    ) {
+    }
+}
+
+impl<G, Data, Counters, P, const BITS: usize> HyperSketching<G, Data, Counters, P, BITS>
+where
+    G: Successors + Send + Sync,
+    <G as Graph>::Nodes: IntoIndexedParallelIterator<Item = G::Node>,
+    Counters: Send
+        + Sync
+        + SequenceAllocable<Item = HyperLogLog<P, BITS>>
+        + AsRef<[HyperLogLog<P, BITS>]>
+        + AsMut<[HyperLogLog<P, BITS>]>,
+    P: Precision + WordType<BITS>,
+    Data: AsRef<HyperSketchingData<Counters>> + AsMut<HyperSketchingData<Counters>>,
+{
+    #[inline(always)]
+    pub fn bias_aware_edge_features<const INSERT_EDGE: bool>(
+        &self,
+        (src, dst): (G::Node, G::Node),
+        target: &mut [f32],
+    ) {
+        if self.data.as_ref().normalize {
+            self.bias_aware_edge_features_dispatched::<INSERT_EDGE, Normalized>((src, dst), target)
+        } else {
+            self.bias_aware_edge_features_dispatched::<INSERT_EDGE, NotNormalized>(
+                (src, dst),
+                target,
+            )
+        }
+    }
+
+    fn bias_aware_edge_features_dispatched<const INSERT_EDGE: bool, Norm: Normalizer>(
+        &self,
+        (src, dst): (G::Node, G::Node),
+        target: &mut [f32],
+    ) {
+        let mask = unsafe {
+            self.masks
+                .as_ref()
+                .expect("bias_aware_edge_features called before fitting")
+                .get_mut()
+        };
+        mask.reset_ones();
+
+        let hops = self.number_of_hops();
+        let mut normalizer = Norm::new(hops);
+
+        // We check that the provided target features are all zero.
+        debug_assert!(
+            target.iter().all(|v| *v == 0.0),
+            "The provided target features must be all zero."
+        );
+
+        let (differential_intersections, differences) = target.split_at_mut(hops * hops);
+
+        debug_assert_eq!(differential_intersections.len(), hops * hops);
+
+        let (left_difference, right_difference) = differences.split_at_mut(hops);
+
+        debug_assert_eq!(left_difference.len(), hops);
+
+        debug_assert_eq!(right_difference.len(), hops);
+
+        // First, we work on the source node.
+
+        let mut frontier: Vec<G::Node> = Vec::new();
+        let mut temporary_frontier = Vec::new();
+        let last_hop = hops - 1;
+
+        let skip_edge = |v: G::Node, w: G::Node| -> bool {
+            (v == src && w == dst) || (self.graph.undirected() && v == dst && w == src)
+        };
+
+        let mut count = |w: G::Node, i: usize| -> bool {
+            let w_usize: usize = w.to();
+            let w_hops: usize = unsafe { mask.get_unchecked(w_usize) };
+            let not_visited = w_hops == self.not_visited();
+
+            left_difference[i] += not_visited as usize as f32;
+            normalizer.inc_left_cardinality(i, not_visited as usize as f32);
+            unsafe {
+                mask.set_unchecked(w_usize, core::cmp::min(w_hops, i));
+            }
+            not_visited
+        };
+
+        count(src, 0);
+        frontier.push(src);
+
+        // Then, we populate the hypersphere of neighbours up to the given number of hops.
+        for i in 0..(hops - 1) {
+            for v in frontier.drain(..) {
+                for w in self.graph.successors(v) {
+                    if !skip_edge(v, w) && count(w, i) {
+                        temporary_frontier.push(w);
+                    }
+                }
+
+                if INSERT_EDGE && v == src && count(dst, i) {
+                    temporary_frontier.push(dst);
+                }
+            }
+            // We swap the frontiers.
+            std::mem::swap(&mut frontier, &mut temporary_frontier);
+        }
+
+        if INSERT_EDGE && hops == 1 {
+            count(dst, 0);
+        }
+
+        for v in frontier.drain(..) {
+            for w in self.graph.successors(v) {
+                if !skip_edge(v, w) {
+                    count(w, last_hop);
+                }
+            }
+        }
+
+        let mut count = |w: G::Node, i: usize| -> bool {
+            let w_usize: usize = w.to();
+            let w_hops: usize = unsafe { mask.get_unchecked(w_usize) };
+            let not_visited = w_hops == self.not_visited();
+            let not_deleted = w_hops != self.deleted();
+
+            if !not_visited && not_deleted {
+                differential_intersections[w_hops * hops + i] += 1.0;
+                left_difference[w_hops] -= 1.0;
+            }
+            right_difference[i] += not_visited as usize as f32;
+            normalizer.inc_right_cardinality(i, not_deleted as usize as f32);
+
+            unsafe {
+                mask.set_unchecked(w_usize, self.deleted());
+            }
+
+            not_deleted
+        };
+
+        count(dst, 0);
+        frontier.push(dst);
+
+        for i in 0..(hops - 1) {
+            for v in frontier.drain(..) {
+                for w in self.graph.successors(v) {
+                    if !skip_edge(v, w) && count(w, i) {
+                        temporary_frontier.push(w);
+                    }
+                }
+
+                if INSERT_EDGE {
+                    if v == src && count(dst, i) {
+                        temporary_frontier.push(dst);
+                    } else if self.graph.undirected() && v == dst && count(src, i) {
+                        temporary_frontier.push(src);
+                    }
+                }
+            }
+
+            // We swap the frontiers.
+            std::mem::swap(&mut frontier, &mut temporary_frontier);
+        }
+
+        if INSERT_EDGE && self.graph.undirected() && hops == 1 {
+            count(src, 0);
+        }
+
+        for v in frontier.drain(..) {
+            for w in self.graph.successors(v) {
+                if !skip_edge(v, w) {
+                    count(w, last_hop);
+                }
+            }
+        }
+
+        normalizer.normalize(
+            differential_intersections,
+            left_difference,
+            right_difference,
+        );
+    }
+}
