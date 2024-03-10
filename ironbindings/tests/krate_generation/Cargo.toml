@@ -1,0 +1,11 @@
+[package]
+name = "krate_generation"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tags = {path="../../tags"}
+
+[package.metadata.ironbindings]
+types.float = ["f32", "f64"]
+types.uint = ["u8", "u16", "u32", "u64", "usize"]

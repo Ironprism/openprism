@@ -3,18 +3,30 @@ resolver = "2"
 members = [
     "irontraits",
     "irongraph", "irongraph/graph", "irongraph/csr", "irongraph/hypersketching",
-    "ironstructs", "ironstructs/ranger", "ironstructs/custom_iters", "ironstructs/par_replica",
+    "ironstructs", "ironstructs/ranger", "ironstructs/custom_iters", "ironstructs/par_replica", "ironbindings",
+    "ironbindings", "ironbindings/tags", "ironbindings/tests/krate_generation",
 ]
 
 [workspace.dependencies]
 epserde = "0.4.1"
 hyperloglog-rs = {git = "https://github.com/LucaCappelletti94/hyperloglog-rs.git", features = ["std"]}
 sux = {git = "https://github.com/vigna/sux-rs.git"}
-anyhow = { version = "1.0", default-features = false }
+anyhow = { version = "1.0", features = ["backtrace"] }
+#rustdoc-json-types = {git = "https://github.com/rust-lang/rust.git"}
+log = "0.4.21"
+env_logger = "0.11.3"
+toml = "0.8.10"
+serde = "1.0.197"
+serde_json = "1.0.114"
+regex = "1.10.3"
+uuid = {version = "1.7.0", features = ["v4"]}
+syn = {version = "2.0.52", features = ["full"]}
 
 irontraits = {path = "irontraits"}
 irongraph = {path = "irongraph"}
 ironstructs = {path = "ironstructs"}
+ironbindings = {path = "ironbindings"}
+
 graph = {path = "irongraph/graph"}
 csr = {path = "irongraph/csr"}
 hypersketching = {path = "irongraph/hypersketching"}

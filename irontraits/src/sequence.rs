@@ -37,8 +37,8 @@ pub trait SequenceRandomAccess: Sequence {
         Self::Item: Ord,
     {
         use core::cmp::Ordering::*;
-        self.binary_search_by(|x| if pred(x) { Less } else { Greater }, range)
-            .unwrap_or_else(|i| i)
+        let (Ok(res) | Err(res)) = self.binary_search_by(|x| if pred(x) { Less } else { Greater }, range);
+        res
     }
 
     #[inline(always)]

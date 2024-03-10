@@ -1,0 +1,16 @@
+[package]
+name = "ironbindings"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+syn.workspace = true
+rayon = "1.8"
+rustdoc-types = "0.24"
+anyhow.workspace = true
+log.workspace = true
+toml.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+regex.workspace = true
+uuid.workspace = true
