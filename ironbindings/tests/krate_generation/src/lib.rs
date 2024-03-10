@@ -1,5 +1,4 @@
-use tags::ironbindings;
-
+#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub struct Pippo {
     field_a: u32,
 }

@@ -30,6 +30,7 @@ impl Module {
 
             for id in module.items.iter() {
                 let item = krate.index.get(id).unwrap();
+                // TODO!: skip items not public or with #[doc(hidden)]
                 match &item.inner {
                     rustdoc_types::ItemEnum::Struct(s) => {
                         structs_handles.push(scope.spawn(|| Struct::parse(krate, item, s)));
