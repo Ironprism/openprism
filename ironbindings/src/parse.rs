@@ -30,7 +30,14 @@ impl Module {
 
             for id in module.items.iter() {
                 let item = krate.index.get(id).unwrap();
-                // TODO!: skip items not public or with #[doc(hidden)]
+                // skip private things
+                if item.visibility != Visibility::Public {
+                    continue;
+                }
+                // skip hidden things
+                if item.attrs.iter().any(|attr| attr.to_string() == "doc(hidden)") {
+                    continue;
+                }
                 match &item.inner {
                     rustdoc_types::ItemEnum::Struct(s) => {
                         structs_handles.push(scope.spawn(|| Struct::parse(krate, item, s)));
@@ -41,6 +48,8 @@ impl Module {
                     rustdoc_types::ItemEnum::Module(m) => {
                         modules_handles.push(scope.spawn(|| Module::parse(krate, item, m)));
                     }
+                    // TODO!: handle re-exports
+                    // TODO!: handle globals
                     _ => {}
                 }
             }
