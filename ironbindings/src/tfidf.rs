@@ -1,11 +1,12 @@
-use std::collections::BTreeMap;
-use std::hash::Hash;
-use itertools::Itertools;
 use crate::utils::Counter;
 use anyhow::{ensure, Result};
+use itertools::Itertools;
+use std::collections::BTreeMap;
+use std::hash::Hash;
 
 pub fn tfidf_splitter<S: AsRef<str>>(method_name: S) -> Vec<String> {
-    method_name.as_ref()
+    method_name
+        .as_ref()
         .split("_")
         .filter(|x| !x.is_empty())
         .map(|x| x.to_lowercase())
@@ -87,13 +88,14 @@ pub struct TFIDF {
 
 /// Pre-compute the TD-IDF weight for each term of each binding.
 /// Then write the compute weights in a file at the given path.
-pub fn tfidf_gen<V, S>(method_names: V) -> Result<TFIDF> 
+pub fn tfidf_gen<V, S>(method_names: V) -> Result<TFIDF>
 where
     V: AsRef<[S]>,
     S: AsRef<str>,
 {
     // split the method names into sub-words
-    let documents = method_names.as_ref()
+    let documents = method_names
+        .as_ref()
         .iter()
         .map(|x| tfidf_splitter(x))
         .collect::<Vec<Vec<String>>>();
@@ -110,7 +112,8 @@ where
 
     Ok(TFIDF {
         unique_terms_list,
-        tfidf: tfidf.into_iter()
+        tfidf: tfidf
+            .into_iter()
             .map(|vals| {
                 vals.into_iter()
                     .map(|(k, v)| (k.to_string(), v))
@@ -169,13 +172,12 @@ where
             let document_len = document.as_ref().len() as f32;
 
             let mut counter = Counter::new();
-            document.as_ref()
-                .iter()
-                .for_each(|word| {
-                    counter.insert(word);
-                });
-                
-            counter.into_iter()
+            document.as_ref().iter().for_each(|word| {
+                counter.insert(word);
+            });
+
+            counter
+                .into_iter()
                 .map(|(word_name, current_document_word_count)| {
                     // Surely the word is, by definition in the vocabulary.
                     let word_id = *vocabulary.get(&word_name).unwrap();

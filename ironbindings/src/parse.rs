@@ -22,7 +22,11 @@ pub struct Module {
 }
 
 impl Module {
-    pub fn parse(krate: &rustdoc_types::Crate, module_item: &Item, module: &rustdoc_types::Module) -> Module {
+    pub fn parse(
+        krate: &rustdoc_types::Crate,
+        module_item: &Item,
+        module: &rustdoc_types::Module,
+    ) -> Module {
         std::thread::scope(|scope| {
             let mut structs_handles = Vec::new();
             let mut functions_handles = Vec::new();
@@ -35,7 +39,11 @@ impl Module {
                     continue;
                 }
                 // skip hidden things
-                if item.attrs.iter().any(|attr| attr.to_string() == "doc(hidden)") {
+                if item
+                    .attrs
+                    .iter()
+                    .any(|attr| attr.to_string() == "doc(hidden)")
+                {
                     continue;
                 }
                 match &item.inner {
@@ -56,7 +64,14 @@ impl Module {
 
             Module {
                 id: module_item.id.clone(),
-                path: krate.paths.get(&module_item.id).unwrap().path.iter().cloned().collect(),
+                path: krate
+                    .paths
+                    .get(&module_item.id)
+                    .unwrap()
+                    .path
+                    .iter()
+                    .cloned()
+                    .collect(),
                 name: module_item.name.clone().unwrap(),
                 visibility: module_item.visibility.clone(),
                 doc: module_item.docs.clone(),
@@ -106,7 +121,14 @@ impl Struct {
 
         Struct {
             id: ztruct_item.id.clone(),
-            path: krate.paths.get(&ztruct_item.id).unwrap().path.iter().cloned().collect(),
+            path: krate
+                .paths
+                .get(&ztruct_item.id)
+                .unwrap()
+                .path
+                .iter()
+                .cloned()
+                .collect(),
             crate_id: ztruct_item.crate_id,
             name: ztruct_item.name.clone().unwrap(),
             doc: ztruct_item.docs.clone(),
@@ -120,7 +142,6 @@ impl Struct {
 pub struct Variant {
     pub impls: Vec<Impl>,
 }
-
 
 #[derive(Debug, Clone)]
 pub struct Impl {
@@ -147,11 +168,18 @@ impl Impl {
                 }
             })
             .collect();
-        
+
         let trait_ = if let Some(trait_) = imp.trait_.as_ref() {
             Some(Trait {
                 id: trait_.id.clone(),
-                path: krate.paths.get(&trait_.id).unwrap().path.iter().cloned().collect(),
+                path: krate
+                    .paths
+                    .get(&trait_.id)
+                    .unwrap()
+                    .path
+                    .iter()
+                    .cloned()
+                    .collect(),
             })
         } else {
             None
@@ -176,14 +204,45 @@ pub struct Function {
 }
 
 impl Function {
-    pub fn parse(krate: &rustdoc_types::Crate, item: &Item, func: &rustdoc_types::Function) -> Function {
+    pub fn parse(
+        krate: &rustdoc_types::Crate,
+        item: &Item,
+        func: &rustdoc_types::Function,
+    ) -> Function {
+        let mut func = func.clone();
+        // convert types to full paths
+        func.decl
+            .inputs
+            .iter_mut()
+            .for_each(|(_arg_name, arg_type)| match arg_type {
+                rustdoc_types::Type::ResolvedPath(rpath) => {
+                    let path = krate.paths.get(&rpath.id).unwrap();
+                    let path = path.path.iter().cloned().collect::<Vec<_>>().join("::");
+                    rpath.name = path;
+                }
+                _ => {}
+            });
+
+        match &mut func.decl.output {
+            Some(rustdoc_types::Type::ResolvedPath(rpath)) => {
+                let path = krate.paths.get(&rpath.id).unwrap();
+                let path = path.path.iter().cloned().collect::<Vec<_>>().join("::");
+                rpath.name = path;
+            }
+            _ => {}
+        }
+
         Function {
             id: item.id.clone(),
             doc: item.docs.clone(),
             visibility: item.visibility.clone(),
-            path: krate.paths.get(&item.id).map(|x| x.path.iter().cloned().collect()).unwrap_or_default(),
+            path: krate
+                .paths
+                .get(&item.id)
+                .map(|x| x.path.iter().cloned().collect())
+                .unwrap_or_default(),
             name: item.name.clone().unwrap(),
-            func: func.clone(),
+            func,
         }
     }
 }
@@ -192,4 +251,5 @@ impl Function {
 pub struct Trait {
     pub id: Id,
     pub path: Vec<String>,
+    pub args: Option<Box<rustdoc_types::GenericArgs>>,
 }

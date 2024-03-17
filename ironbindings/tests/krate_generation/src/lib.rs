@@ -29,3 +29,17 @@ impl core::ops::Add<Self> for Pippo {
         }
     }
 }
+
+impl core::ops::Index<usize> for Pippo {
+    type Output = u32;
+    fn index(&self, _idx: usize) -> &Self::Output {
+        &self.field_a
+    }
+}
+
+impl core::ops::Index<u8> for Pippo {
+    type Output = u32;
+    fn index(&self, _idx: u8) -> &Self::Output {
+        &self.field_a
+    }
+}

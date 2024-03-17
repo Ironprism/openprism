@@ -17,3 +17,4 @@ uuid.workspace = true
 proc-macro2.workspace = true
 quote.workspace = true
 itertools = "0.12.1"
+stderrlog = "0.6.0"

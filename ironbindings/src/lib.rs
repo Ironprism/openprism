@@ -1,6 +1,4 @@
-
 pub mod python;
-pub mod parse;
 pub mod rustdoc;
-pub mod utils;
 pub mod tfidf;
+pub mod utils;
