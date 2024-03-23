@@ -1,10 +1,9 @@
+use crate::utils::temp_dir;
 use anyhow::{Context, Result};
+use regex::Regex;
 use rustdoc_types::Crate;
 use std::path::Path;
 use std::process::Command;
-use regex::Regex;
-use crate::utils::temp_dir;
-
 
 /// Generate the documentation json for a crate in a temporary folder and
 /// return the parsed `Crate` struct.
@@ -29,11 +28,15 @@ pub fn doc_crate<P: AsRef<Path>>(path: P) -> Result<Crate> {
 }
 
 pub fn doc_crate_with_dir<P: AsRef<Path>, P2: AsRef<Path>>(path: P, tmp_dir: P2) -> Result<Crate> {
-    log::debug!("Creating rustdoc json for {} @ dir {}", path.as_ref().to_string_lossy(), tmp_dir.as_ref().to_string_lossy());
+    log::debug!(
+        "Creating rustdoc json for {} @ dir {}",
+        path.as_ref().to_string_lossy(),
+        tmp_dir.as_ref().to_string_lossy()
+    );
     let output = Command::new("cargo")
         .args(&[
             "rustdoc",
-            "-Z", 
+            "-Z",
             "unstable-options",
             "--output-format=json",
             &format!(
@@ -50,8 +53,14 @@ pub fn doc_crate_with_dir<P: AsRef<Path>, P2: AsRef<Path>>(path: P, tmp_dir: P2)
             )
         })?;
     log::debug!("Rustdoc exit code: {}", output.status.to_string());
-    log::debug!("Rustdoc stdout: {}", String::from_utf8_lossy(&output.stdout));
-    log::debug!("Rustdoc stderr: {}", String::from_utf8_lossy(&output.stderr));
+    log::debug!(
+        "Rustdoc stdout: {}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    log::debug!(
+        "Rustdoc stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     if !output.status.success() {
         return Err(anyhow::anyhow!(
             "Cargo rustdoc failed for crate {}",
@@ -61,7 +70,8 @@ pub fn doc_crate_with_dir<P: AsRef<Path>, P2: AsRef<Path>>(path: P, tmp_dir: P2)
 
     let re = Regex::new(r"Generated (.+.json)").unwrap();
     let stderr = String::from_utf8_lossy(&output.stderr);
-    let cap = re.captures(&stderr)
+    let cap = re
+        .captures(&stderr)
         .with_context(|| format!("Could find the generated jsons in the rustdoc stderr"))?;
     log::debug!("Captures: {:#2?}", &cap);
 
@@ -73,7 +83,8 @@ pub fn doc_crate_with_dir<P: AsRef<Path>, P2: AsRef<Path>>(path: P, tmp_dir: P2)
     log::trace!("Rustdoc json: {}", &json_file);
     std::fs::write("dbg.json", &json_file).unwrap();
 
-    let krate = serde_json::from_str::<Crate>(&json_file).with_context(|| format!("Could not parse the generated rustdoc json"))?;
+    let krate = serde_json::from_str::<Crate>(&json_file)
+        .with_context(|| format!("Could not parse the generated rustdoc json"))?;
     log::trace!("Parsed rustdoc json: {:#2?}", krate);
     Ok(krate)
 }

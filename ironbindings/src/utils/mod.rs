@@ -1,5 +1,14 @@
 use anyhow::{Context, Result};
 
+mod counter;
+pub use counter::*;
+
+mod twine;
+pub use twine::*;
+
+mod unwrap_as;
+pub use unwrap_as::*;
+
 /// read std::env::dir with an unique name
 pub fn temp_dir() -> Result<std::path::PathBuf> {
     let mut path = std::env::temp_dir();
