@@ -1,7 +1,11 @@
 //! Module defining the decorator component for Python projects.
 use super::component::Component;
 use crate::python_token::Token;
+use serde::{Serialize, Deserialize};
+use std::fmt::{Display, Formatter};
+use std::fmt;
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 /// Enum defining custom decorators we made up to better handle the complexity of Rust to Python bindings.
 pub enum Decorator {
     /// The `Unsafe` decorator is used to mark a function as unsafe.

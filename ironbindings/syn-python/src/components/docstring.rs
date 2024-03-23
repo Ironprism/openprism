@@ -120,8 +120,11 @@ use crate::python_token::Token;
 
 use super::component::Component;
 use super::typing::Typing;
-use anyhow::Result;
+use serde::{Serialize, Deserialize};
+use std::fmt::{Display, Formatter};
+use std::fmt;
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum Arg {
     Slf, // self, but with a different name to avoid conflict with the Rust keyword
     Cls,
@@ -129,15 +132,21 @@ pub enum Arg {
 }
 
 impl Arg {
-    pub fn new(name: Token, typing: Typing) -> Result<Arg> {
-        Ok(Arg { name, typing })
+    pub fn new(name: Token, typing: Typing) -> Result<Arg, String> {
+        if name.value() == "self" {
+            return Err("Cannot use `self` as an argument name".to_string());
+        }
+        if name.value() == "cls" {
+            return Err("Cannot use `cls` as an argument name".to_string());
+        }
+        Ok(Arg::Arg(name, typing))
     }
 
     pub fn name(&self) -> Token {
         match self {
             Arg::Slf => Token::try_from("self").unwrap(),
             Arg::Cls => Token::try_from("cls").unwrap(),
-            Arg::Arg(name, _) => name.clone()
+            Arg::Arg(name, _) => name.clone(),
         }
     }
 
@@ -161,34 +170,44 @@ impl Display for Arg {
         if self.is_implicit() {
             write!(f, "{}", self.name())
         } else {
-            write!(f, "{}: {}", self.name(), self.typing)
+            write!(f, "{}: {}", self.name(), self.typing().unwrap())
         }
     }
 }
 
 impl Component for Arg {}
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct DocArg {
     arg: Arg,
     description: Option<String>,
 }
 
 impl DocArg {
-    pub fn new(arg: Arg, description: String) -> Result<DocArg> {
+    pub fn new(arg: Arg, description: String) -> Result<DocArg, String> {
         if description.is_empty() {
-            return Err(anyhow::anyhow!("Description cannot be empty"));
-        }
-        Ok(DocArg { arg, description: Some(description) })
-    }
-
-    pub fn new_implicit_arg(arg: Arg) -> Result<DocArg> {
-        if !arg.is_implicit() {
-            return Err(anyhow::anyhow!("Implicit arguments must be either `self` or `cls`"));
+            return Err("Description cannot be empty".to_string());
         }
         Ok(DocArg {
             arg,
-            description: None
+            description: Some(description),
         })
+    }
+
+    pub fn new_implicit_arg(arg: Arg) -> Result<DocArg, String> {
+        if !arg.is_implicit() {
+            return Err(
+                "Implicit arguments must be either `self` or `cls`".to_string(),
+            );
+        }
+        Ok(DocArg {
+            arg,
+            description: None,
+        })
+    }
+
+    pub fn is_implicit(&self) -> bool {
+        self.arg.is_implicit()
     }
 
     pub fn arg(&self) -> &Arg {
@@ -213,8 +232,9 @@ impl Display for DocArg {
 
 impl Component for DocArg {}
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct Docstring {
-    summary: String,
+    summary: Option<String>,
     description: Option<String>,
     args: Vec<DocArg>,
     returns: Option<DocArg>,
@@ -222,60 +242,48 @@ pub struct Docstring {
     safety: Option<String>,
 }
 
-const DEFAULT_SAFETY_MESSAGE: &str = "This function is marked as unsafe and may cause undefined behavior if called incorrectly.";
+const DEFAULT_SAFETY_MESSAGE: &str =
+    "This function is marked as unsafe and may cause undefined behavior if called incorrectly.";
 
 impl Docstring {
+    pub fn set_description(&mut self, description: String) -> Result<(), String> {
+        if description.is_empty() {
+            return Err("Description cannot be empty".to_string());
+        }
+        self.description = Some(description);
+        Ok(())
+    }
 
-    pub fn new(
-        summary: String,
-        description: Option<String>,
-        args: Vec<DocArg>,
-        returns: Option<DocArg>,
-        raises: Vec<DocArg>,
-        safety: Option<String>,
-    ) -> Result<Docstring> {
+    pub fn set_summary(&mut self, summary: String) -> Result<(), String> {
         if summary.is_empty() {
-            return Err(anyhow::anyhow!("Summary cannot be empty"));
+            return Err("Summary cannot be empty".to_string());
         }
-        if let Some(description) = &description {
-            if description.is_empty() {
-                return Err(anyhow::anyhow!("Description cannot be empty"));
-            }
+        self.summary = Some(summary);
+        Ok(())
+    }
+
+    pub fn add_arg(&mut self, arg: DocArg) {
+        self.args.push(arg);
+    }
+
+    pub fn set_returns(&mut self, returns: DocArg) {
+        self.returns = Some(returns);
+    }
+
+    pub fn add_raise(&mut self, raise: DocArg) {
+        self.raises.push(raise);
+    }
+
+    pub fn set_default_safety_message(&mut self) {
+        self.set_safety_message(DEFAULT_SAFETY_MESSAGE.to_string()).unwrap();
+    }
+
+    pub fn set_safety_message(&mut self, safety: String) -> Result<(), String> {
+        if safety.is_empty() {
+            return Err("Safety message cannot be empty".to_string());
         }
-
-        Ok(Docstring {
-            summary,
-            description,
-            args,
-            returns,
-            raises,
-            safety
-        })
-    }
-
-    pub fn new_unsafe(
-        summary: String,
-        description: Option<String>,
-        args: Vec<DocArg>,
-        returns: Option<DocArg>,
-        raises: Vec<DocArg>,
-    ) -> Result<Docstring> {
-        Docstring::new(
-            summary,
-            description,
-            args,
-            returns,
-            raises,
-            Some(DEFAULT_SAFETY_MESSAGE.to_string())
-        )
-    }
-
-    pub fn summary(&self) -> &str {
-        &self.summary
-    }
-
-    pub fn description(&self) -> &str {
-        &self.description
+        self.safety = Some(safety);
+        Ok(())
     }
 
     pub fn args(&self) -> &[DocArg] {
@@ -283,6 +291,11 @@ impl Docstring {
     }
 
     pub fn prepend_implicit_arg(&mut self, arg: Arg) -> Result<(), String> {
+        // We check that there are no other implicit arguments already in the list
+        if self.args.iter().any(|doc_arg| doc_arg.arg().is_implicit()) {
+            return Err("Cannot add an implicit argument when there is already an implicit argument in the list".to_string());
+        }
+
         self.args.insert(0, DocArg::new_implicit_arg(arg)?);
         Ok(())
     }
@@ -302,7 +315,10 @@ impl Docstring {
 
 impl Display for Docstring {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "\"\"\"\n{}\n\n", self.summary)?;
+        write!(f, "\"\"\"\n")?;
+        if let Some(summary) = &self.summary {
+            write!(f, "{}\n\n", summary)?;
+        }
         if let Some(description) = &self.description {
             write!(f, "{}\n\n", description)?;
         }

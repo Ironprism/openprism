@@ -7,7 +7,11 @@
 //! defined as part of the enum `Typing`.
 use super::component::Component;
 use crate::python_token::Token;
+use serde::{Serialize, Deserialize};
+use std::fmt::{Display, Formatter};
+use std::fmt;
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum NumpyType {
     /// 8-bit integer.
     Int8,
@@ -49,6 +53,8 @@ impl From<NumpyType> for Token {
     }
 }
 
+impl Component for NumpyType {}
+
 impl Display for NumpyType {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
@@ -72,6 +78,7 @@ impl Display for NumpyType {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum Typing {
     /// Integer type.
     Int,
@@ -90,7 +97,7 @@ pub enum Typing {
     /// Optional type, such as `Optional[int]`.
     Optional(Box<Typing>),
     /// A custom type, such as `MyClass`.
-    Custom(String),
+    Custom(Token),
     /// A list type, such as `List[int]`.
     List(Box<Typing>),
     /// A dictionary type, such as `Dict[str, int]`.
@@ -115,8 +122,22 @@ impl Display for Typing {
             Typing::Custom(t) => write!(f, "{}", t),
             Typing::List(t) => write!(f, "List[{}]", t),
             Typing::Dict(k, v) => write!(f, "Dict[{}, {}]", k, v),
-            Typing::Tuple(t) => write!(f, "Tuple[{}]", t.iter().map(|t| t.to_string()).collect::<Vec<String>>().join(", ")),
-            Typing::Union(t) => write!(f, "Union[{}]", t.iter().map(|t| t.to_string()).collect::<Vec<String>>().join(", ")),
+            Typing::Tuple(t) => write!(
+                f,
+                "Tuple[{}]",
+                t.iter()
+                    .map(|t| t.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
+            Typing::Union(t) => write!(
+                f,
+                "Union[{}]",
+                t.iter()
+                    .map(|t| t.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
         }
     }
 }

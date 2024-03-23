@@ -14,9 +14,12 @@
 //! a [`Method`] into a [`Function`], adding the first argument as needed.
 
 use crate::python_token::Token;
+use serde::{Serialize, Deserialize};
+use std::fmt::{Display, Formatter};
+use std::fmt;
+use super::{decorator::Decorator, docstring::{Arg, DocArg, Docstring}, function::Function};
 
-use super::{decorator::Decorator, docstring::Arg, function::Function};
-
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum MethodDecorators {
     StaticMethod,
     ClassMethod,
@@ -61,6 +64,7 @@ impl From<MethodDecorators> for Decorator {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Method {
     name: Token,
     docstring: Option<Docstring>,
@@ -80,6 +84,38 @@ impl Method {
         self.method_decorators.contains(&MethodDecorators::ClassMethod)
     }
 
+    /// Set the provided docstring
+    pub fn set_docstring(&mut self, docstring: Docstring) {
+        self.docstring = Some(docstring);
+    }
+
+    /// Set the provided docstring summary
+    pub fn set_docstring_summary(&mut self, summary: String) -> Result<(), String> {
+        if let Some(docstring) = &mut self.docstring {
+            docstring.set_summary(summary)?;
+        } else {
+            self.docstring = Some(Docstring::default());
+            self.set_docstring_summary(summary)?;
+        }
+        Ok(())
+    }
+
+    /// Add a documented argument to the docstring
+    pub fn add_documented_argument(&mut self, doc_arg: DocArg) -> Result<(), String> {
+        if self.docstring.is_none() {
+            return Err("Cannot add a documented argument to a method without a docstring. First set the docstring summary using `set_docstring_summary`.".to_string());
+        }
+
+        if doc_arg.is_implicit() {
+            return Err("Cannot add an implicit argument to a method.".to_string());
+        }
+
+        if let Some(docstring) = &mut self.docstring {
+            docstring.add_arg(doc_arg);
+        }
+        Ok(())
+    }
+
     /// Returns the first argument of the method.
     pub fn first_argument(&self) -> Option<Arg> {
         if self.is_class_method() {
@@ -93,17 +129,31 @@ impl Method {
 }
 
 impl From<Method> for Function {
-    fn from(m: Method) -> Function {
+    fn from(mut m: Method) -> Function {
+        let first_argument = m.first_argument();
         let mut decorators = m.decorators;
         for method_decorator in m.method_decorators {
             decorators.push(method_decorator.into());
         }
-        let mut docstring: Option<Docstring> = m.docstring;
 
-        if let (Some(first_argument), Some(docstring)) = (m.first_argument(), docstring.as_mut()) {
-            docstring.add_arg(first_argument);
+        if let (Some(first_argument), Some(docstring)) = (first_argument, m.docstring.as_mut()) {
+            docstring.prepend_implicit_arg(first_argument).unwrap();
         }
 
-        Function::new(m.name, docstring, m.body, decorators)
+        let mut function = Function::new(m.name, m.body);
+
+        if let Some(docstring) = m.docstring {
+            function.set_docstring(docstring);
+        }
+        function.add_decorators(decorators).unwrap();
+
+        function
+    }
+}
+
+impl Display for Method {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let function: Function = self.clone().into();
+        write!(f, "{}", function)
     }
 }
