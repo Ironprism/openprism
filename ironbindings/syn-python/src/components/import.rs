@@ -1,18 +1,39 @@
 //! Module defining the import statement for Python projects.
+use crate::python_token::Token;
+
 use super::component::Component;
 
 pub struct Import {
-    name: String,
-    alias: Option<String>,
+    name: Token,
+    alias: Option<Token>,
 }
 
-impl ToString for Import {
-    fn to_string(&self) -> String {
+impl Display for Import {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match &self.alias {
-            Some(alias) => format!("import {} as {}", self.name, alias),
-            None => format!("import {}", self.name),
+            Some(alias) => write!(f, "import {} as {}", self.name, alias),
+            None => write!(f, "import {}", self.name),
         }
     }
 }
 
+pub struct ImportFrom {
+    module: Token,
+    names: Vec<(Token, Option<Token>)>,
+}
+
+impl Display for ImportFrom {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "from {} import ", self.module)?;
+        for (name, alias) in &self.names {
+            match alias {
+                Some(alias) => write!(f, "{} as {}, ", name, alias),
+                None => write!(f, "{}, ", name),
+            }
+        }
+        Ok(())
+    }
+}
+
 impl Component for Import {}
+impl Component for ImportFrom {}

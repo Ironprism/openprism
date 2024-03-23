@@ -52,36 +52,117 @@
 //!     return bar
 //! ```
 //!
+//! We use these docstrings to document bindigs from Rust to Python. As such, there
+//! may be some functions in Rust that are unsafe, i.e. they may cause undefined behavior
+//! if called incorrectly. In Python, there is no concept of unsafe code, so we use a custom
+//! decorator to mark these functions as unsafe. The custom decorator we use is the [`CustomDecorators::Unsafe`].
+//! In methods and functions that have the `unsafe` decorator, we include a warning in the docstring
+//! that the function is unsafe and may cause undefined behavior if called incorrectly when there is
+//! no better description provided. Alternatively, when the description is provided, we include the
+//! warning in the description.
+//!
+//! The following is an example of documentation of an unsafe function without a provided description:
+//!
+//! ```python
+//! def foo(bar: int) -> int:
+//!    """Summary line.
+//!
+//!    Extended description of function.
+//!
+//!    Args:
+//!      bar (int): Description of bar
+//!
+//!    Returns:
+//!      int: Description of return value
+//!
+//!    Raises:
+//!      ValueError: If bar is not an integer
+//!
+//!    Safety:
+//!      This function is marked as unsafe and may cause undefined behavior if called incorrectly.
+//!   """
+//!   if not isinstance(bar, int):
+//!       raise ValueError("bar must be an integer")
+//!   return bar
+//! ```
+//!
+//! The following is an example of documentation of an unsafe function with a provided description:
+//!
+//! ```python
+//! def foo(bar: int) -> int:
+//!    """Summary line.
+//!
+//!    Extended description of function.
+//!
+//!    Args:
+//!      bar (int): Description of bar
+//!
+//!    Returns:
+//!      int: Description of return value
+//!
+//!    Raises:
+//!      ValueError: If bar is not an integer
+//!
+//!    Safety:
+//!      Note that we assume that bar is a positive non-zero integer and that the function may
+//!      cause undefined behavior if called with a negative or zero integer.
+//!
+//!   """
+//!   if not isinstance(bar, int):
+//!       raise ValueError("bar must be an integer")
+//!   
+//!   return int(math.sqrt(bar))
+//! ```
+//!
+//! [`CustomDecorators::Unsafe`]: enum.CustomDecorators.html#variant.Unsafe
+
+use crate::python_token::Token;
 
 use super::component::Component;
 use super::typing::Typing;
 use anyhow::Result;
 
-pub struct Arg {
-    name: String,
-    typing: Typing
+pub enum Arg {
+    Slf, // self, but with a different name to avoid conflict with the Rust keyword
+    Cls,
+    Arg(Token, Typing),
 }
 
 impl Arg {
-    pub fn new(name: String, typing: Typing) -> Result<Arg> {
-        if name.is_empty() {
-            return Err(anyhow::anyhow!("Arg name cannot be empty"));
-        }
+    pub fn new(name: Token, typing: Typing) -> Result<Arg> {
         Ok(Arg { name, typing })
     }
 
-    pub fn name(&self) -> &str {
-        &self.name
+    pub fn name(&self) -> Token {
+        match self {
+            Arg::Slf => Token::try_from("self").unwrap(),
+            Arg::Cls => Token::try_from("cls").unwrap(),
+            Arg::Arg(name, _) => name.clone()
+        }
     }
 
-    pub fn typing(&self) -> &Typing {
-        &self.typing
+    pub fn typing(&self) -> Option<&Typing> {
+        match self {
+            Arg::Arg(_, typing) => Some(typing),
+            _ => None,
+        }
+    }
+
+    pub fn is_implicit(&self) -> bool {
+        match self {
+            Arg::Slf | Arg::Cls => true,
+            _ => false,
+        }
     }
 }
 
-impl ToString for Arg {
-    fn to_string(&self) -> String {
-        format!("{}: {}", self.name, self.typing.to_string())
+impl Display for Arg {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        if self.is_implicit() {
+            write!(f, "{}", self.name())
+        } else {
+            write!(f, "{}: {}", self.name(), self.typing)
+        }
     }
 }
 
@@ -89,7 +170,7 @@ impl Component for Arg {}
 
 pub struct DocArg {
     arg: Arg,
-    description: String
+    description: Option<String>,
 }
 
 impl DocArg {
@@ -97,13 +178,36 @@ impl DocArg {
         if description.is_empty() {
             return Err(anyhow::anyhow!("Description cannot be empty"));
         }
-        Ok(DocArg { arg, description })
+        Ok(DocArg { arg, description: Some(description) })
+    }
+
+    pub fn new_implicit_arg(arg: Arg) -> Result<DocArg> {
+        if !arg.is_implicit() {
+            return Err(anyhow::anyhow!("Implicit arguments must be either `self` or `cls`"));
+        }
+        Ok(DocArg {
+            arg,
+            description: None
+        })
+    }
+
+    pub fn arg(&self) -> &Arg {
+        &self.arg
     }
 }
 
-impl ToString for DocArg {
-    fn to_string(&self) -> String {
-        format!("{} ({}) - {}", self.arg.name, self.arg.typing.to_string(), self.description)
+impl Display for DocArg {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        if self.arg.is_implicit() {
+            return write!(f, "");
+        }
+        write!(
+            f,
+            "{} ({}) - {}",
+            self.arg.name(),
+            self.arg.typing().unwrap(),
+            self.description.as_ref().unwrap()
+        )
     }
 }
 
@@ -111,21 +215,59 @@ impl Component for DocArg {}
 
 pub struct Docstring {
     summary: String,
-    description: String,
+    description: Option<String>,
     args: Vec<DocArg>,
     returns: Option<DocArg>,
-    raises: Vec<DocArg>
+    raises: Vec<DocArg>,
+    safety: Option<String>,
 }
 
+const DEFAULT_SAFETY_MESSAGE: &str = "This function is marked as unsafe and may cause undefined behavior if called incorrectly.";
+
 impl Docstring {
-    pub fn new(summary: String, description: String, args: Vec<DocArg>, returns: Option<DocArg>, raises: Vec<DocArg>) -> Result<Docstring> {
+
+    pub fn new(
+        summary: String,
+        description: Option<String>,
+        args: Vec<DocArg>,
+        returns: Option<DocArg>,
+        raises: Vec<DocArg>,
+        safety: Option<String>,
+    ) -> Result<Docstring> {
         if summary.is_empty() {
             return Err(anyhow::anyhow!("Summary cannot be empty"));
         }
-        if description.is_empty() {
-            return Err(anyhow::anyhow!("Description cannot be empty"));
+        if let Some(description) = &description {
+            if description.is_empty() {
+                return Err(anyhow::anyhow!("Description cannot be empty"));
+            }
         }
-        Ok(Docstring { summary, description, args, returns, raises })
+
+        Ok(Docstring {
+            summary,
+            description,
+            args,
+            returns,
+            raises,
+            safety
+        })
+    }
+
+    pub fn new_unsafe(
+        summary: String,
+        description: Option<String>,
+        args: Vec<DocArg>,
+        returns: Option<DocArg>,
+        raises: Vec<DocArg>,
+    ) -> Result<Docstring> {
+        Docstring::new(
+            summary,
+            description,
+            args,
+            returns,
+            raises,
+            Some(DEFAULT_SAFETY_MESSAGE.to_string())
+        )
     }
 
     pub fn summary(&self) -> &str {
@@ -136,41 +278,56 @@ impl Docstring {
         &self.description
     }
 
-    pub fn args(&self) -> &Vec<DocArg> {
+    pub fn args(&self) -> &[DocArg] {
         &self.args
+    }
+
+    pub fn prepend_implicit_arg(&mut self, arg: Arg) -> Result<(), String> {
+        self.args.insert(0, DocArg::new_implicit_arg(arg)?);
+        Ok(())
     }
 
     pub fn returns(&self) -> &Option<DocArg> {
         &self.returns
     }
 
-    pub fn raises(&self) -> &Vec<DocArg> {
+    pub fn raises(&self) -> &[DocArg] {
         &self.raises
+    }
+
+    pub fn has_safety_message(&self) -> bool {
+        self.safety.is_some()
     }
 }
 
-impl ToString for Docstring {
-    fn to_string(&self) -> String {
-        let mut s = format!("\"\"\"\n{}\n\n{}\n\n", self.summary, self.description);
+impl Display for Docstring {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "\"\"\"\n{}\n\n", self.summary)?;
+        if let Some(description) = &self.description {
+            write!(f, "{}\n\n", description)?;
+        }
         if !self.args.is_empty() {
-            s.push_str("Args:\n");
+            write!(f, "Args:\n")?;
             for arg in &self.args {
-                s.push_str(&format!("    {}\n", arg.to_string()));
+                write!(f, "    {}\n", arg)?;
             }
-            s.push_str("\n");
+            write!(f, "\n")?;
         }
         if let Some(returns) = &self.returns {
-            s.push_str("Returns:\n");
-            s.push_str(&format!("    {}\n\n", returns.to_string()));
+            write!(f, "Returns:\n")?;
+            write!(f, "    {}\n\n", returns)?;
         }
         if !self.raises.is_empty() {
-            s.push_str("Raises:\n");
+            write!(f, "Raises:\n")?;
             for arg in &self.raises {
-                s.push_str(&format!("    {}\n", arg.to_string()));
+                write!(f, "    {}\n", arg)?;
             }
         }
-        s.push_str("\"\"\"");
-        s
+        if let Some(safety) = &self.safety {
+            write!(f, "\nSafety:\n")?;
+            write!(f, "    {}\n", safety)?;
+        }
+        write!(f, "\"\"\"")
     }
 }
 
