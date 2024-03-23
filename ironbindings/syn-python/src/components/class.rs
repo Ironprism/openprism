@@ -1,8 +1,8 @@
 /// Module defining the class component for Python projects.
 use crate::python_token::Token;
-use std::fmt::{Display, Formatter};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::fmt;
+use std::fmt::{Display, Formatter};
 
 use super::{decorator::Decorator, method::Method};
 
@@ -16,7 +16,12 @@ pub struct Class {
 
 impl Class {
     pub fn new(name: Token) -> Class {
-        Class { name, parents: Vec::new(), decorators: Vec::new(), methods: Vec::new() }
+        Class {
+            name,
+            parents: Vec::new(),
+            decorators: Vec::new(),
+            methods: Vec::new(),
+        }
     }
 
     pub fn add_method(&mut self, method: Method) {
@@ -26,7 +31,6 @@ impl Class {
     pub fn add_decorator(&mut self, decorator: Decorator) {
         self.decorators.push(decorator);
     }
-
 
     pub fn add_parent(&mut self, parent: Class) {
         self.parents.push(parent);

@@ -4,7 +4,7 @@ pub mod decorator;
 pub mod docstring;
 pub mod function;
 pub mod import;
+pub mod method;
 pub mod module;
 pub mod package;
 pub mod typing;
-pub mod method;

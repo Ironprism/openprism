@@ -1,9 +1,9 @@
 //! Module defining the decorator component for Python projects.
 use super::component::Component;
 use crate::python_token::Token;
-use serde::{Serialize, Deserialize};
-use std::fmt::{Display, Formatter};
+use serde::{Deserialize, Serialize};
 use std::fmt;
+use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 /// Enum defining custom decorators we made up to better handle the complexity of Rust to Python bindings.

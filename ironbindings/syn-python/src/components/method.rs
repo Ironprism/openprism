@@ -1,23 +1,27 @@
 //! Submodule providing the `Method` component.
-//! 
+//!
 //! A method differs from a function in that it is defined within a class.
 //! Differently from a function, depending from the potential decorators that
 //! may be applied to it, a method may have a different signature. Without
 //! decorators, the first argument of a method is always `self`, which is
 //! a reference to the instance of the class that is calling the method.
-//! 
+//!
 //! When a method is defined as a class method, the first argument is `cls`,
 //! which is a reference to the class itself. When a method is defined as a
 //! static method, it does not have any reference to the class or the instance.
-//! 
+//!
 //! In order to avoid code duplication, we implement the [`From`] trait to convert
 //! a [`Method`] into a [`Function`], adding the first argument as needed.
 
+use super::{
+    decorator::Decorator,
+    docstring::{Arg, DocArg, Docstring},
+    function::Function,
+};
 use crate::python_token::Token;
-use serde::{Serialize, Deserialize};
-use std::fmt::{Display, Formatter};
+use serde::{Deserialize, Serialize};
 use std::fmt;
-use super::{decorator::Decorator, docstring::{Arg, DocArg, Docstring}, function::Function};
+use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum MethodDecorators {
@@ -76,12 +80,14 @@ pub struct Method {
 impl Method {
     /// Returns whether the method is a static method.
     pub fn is_static_method(&self) -> bool {
-        self.method_decorators.contains(&MethodDecorators::StaticMethod)
+        self.method_decorators
+            .contains(&MethodDecorators::StaticMethod)
     }
 
     /// Returns whether the method is a class method.
     pub fn is_class_method(&self) -> bool {
-        self.method_decorators.contains(&MethodDecorators::ClassMethod)
+        self.method_decorators
+            .contains(&MethodDecorators::ClassMethod)
     }
 
     /// Set the provided docstring

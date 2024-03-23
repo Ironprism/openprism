@@ -1,13 +1,13 @@
 //! Submodule defining a Python module.
 
-use std::fmt::{Display, Formatter};
-use crate::python_token::Token;
-use std::fmt;
-use super::component::Component;
-use super::import::{Import, ImportFrom};
-use serde::{Serialize, Deserialize};
-use super::function::Function;
 use super::class::Class;
+use super::component::Component;
+use super::function::Function;
+use super::import::{Import, ImportFrom};
+use crate::python_token::Token;
+use serde::{Deserialize, Serialize};
+use std::fmt;
+use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ModuleDocstring {
@@ -34,13 +34,19 @@ impl ModuleDocstring {
         }
 
         Ok(ModuleDocstring { docstring })
-    }    
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum ModuleType {
+    Init,
+    Submodule(Token),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Module {
     /// The name of the Python file that will be generated.
-    name: Token,
+    module_type: ModuleType,
     /// The docstring of the module.
     docstring: Option<ModuleDocstring>,
     /// The imports of the module, of the form `import x.y.z as a`.
@@ -54,8 +60,15 @@ pub struct Module {
 }
 
 impl Module {
-    pub fn new(name: Token) -> Module {
-        Module { name, docstring: None, imports: Vec::new(), import_froms: Vec::new(), functions: Vec::new(), classes: Vec::new() }
+    pub fn new(module_type: ModuleType) -> Module {
+        Module {
+            module_type,
+            docstring: None,
+            imports: Vec::new(),
+            import_froms: Vec::new(),
+            functions: Vec::new(),
+            classes: Vec::new(),
+        }
     }
 
     pub fn add_import(&mut self, import: Import) {
@@ -76,10 +89,6 @@ impl Module {
 
     pub fn set_docstring(&mut self, docstring: ModuleDocstring) {
         self.docstring = Some(docstring);
-    }
-
-    pub fn name(&self) -> &Token {
-        &self.name
     }
 }
 

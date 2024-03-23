@@ -120,9 +120,9 @@ use crate::python_token::Token;
 
 use super::component::Component;
 use super::typing::Typing;
-use serde::{Serialize, Deserialize};
-use std::fmt::{Display, Formatter};
+use serde::{Deserialize, Serialize};
 use std::fmt;
+use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum Arg {
@@ -196,9 +196,7 @@ impl DocArg {
 
     pub fn new_implicit_arg(arg: Arg) -> Result<DocArg, String> {
         if !arg.is_implicit() {
-            return Err(
-                "Implicit arguments must be either `self` or `cls`".to_string(),
-            );
+            return Err("Implicit arguments must be either `self` or `cls`".to_string());
         }
         Ok(DocArg {
             arg,
@@ -275,7 +273,8 @@ impl Docstring {
     }
 
     pub fn set_default_safety_message(&mut self) {
-        self.set_safety_message(DEFAULT_SAFETY_MESSAGE.to_string()).unwrap();
+        self.set_safety_message(DEFAULT_SAFETY_MESSAGE.to_string())
+            .unwrap();
     }
 
     pub fn set_safety_message(&mut self, safety: String) -> Result<(), String> {

@@ -7,9 +7,9 @@
 //! defined as part of the enum `Typing`.
 use super::component::Component;
 use crate::python_token::Token;
-use serde::{Serialize, Deserialize};
-use std::fmt::{Display, Formatter};
+use serde::{Deserialize, Serialize};
 use std::fmt;
+use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum NumpyType {

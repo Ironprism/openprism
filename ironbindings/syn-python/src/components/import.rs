@@ -1,9 +1,9 @@
 //! Module defining the import statement for Python projects.
-use crate::python_token::Token;
-use std::fmt::{Display, Formatter};
 use super::component::Component;
-use serde::{Serialize, Deserialize};
+use crate::python_token::Token;
+use serde::{Deserialize, Serialize};
 use std::fmt;
+use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Import {
@@ -14,8 +14,25 @@ pub struct Import {
 impl Display for Import {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match &self.alias {
-            Some(alias) => write!(f, "import {} as {}", self.import_path.iter().map(|token| token.to_string()).collect::<Vec<_>>().join("."), alias),
-            None => write!(f, "import {}", self.import_path.iter().map(|token| token.to_string()).collect::<Vec<_>>().join(".")),
+            Some(alias) => write!(
+                f,
+                "import {} as {}",
+                self.import_path
+                    .iter()
+                    .map(|token| token.to_string())
+                    .collect::<Vec<_>>()
+                    .join("."),
+                alias
+            ),
+            None => write!(
+                f,
+                "import {}",
+                self.import_path
+                    .iter()
+                    .map(|token| token.to_string())
+                    .collect::<Vec<_>>()
+                    .join(".")
+            ),
         }
     }
 }
@@ -28,7 +45,15 @@ pub struct ImportFrom {
 
 impl Display for ImportFrom {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "from {} import ", self.import_path.iter().map(|token| token.to_string()).collect::<Vec<_>>().join("."))?;
+        write!(
+            f,
+            "from {} import ",
+            self.import_path
+                .iter()
+                .map(|token| token.to_string())
+                .collect::<Vec<_>>()
+                .join(".")
+        )?;
         for (name, alias) in &self.names {
             match alias {
                 Some(alias) => write!(f, "{} as {}, ", name, alias)?,

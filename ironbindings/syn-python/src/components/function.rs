@@ -1,12 +1,12 @@
 //! Module defining the function component for Python projects.
 use super::component::Component;
-use super::docstring::DocArg;
-use serde::{Serialize, Deserialize};
-use super::docstring::Docstring;
-use std::fmt::{Display, Formatter};
-use std::fmt;
 use super::decorator::Decorator;
+use super::docstring::DocArg;
+use super::docstring::Docstring;
 use crate::python_token::Token;
+use serde::{Deserialize, Serialize};
+use std::fmt;
+use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Function {
@@ -18,7 +18,12 @@ pub struct Function {
 
 impl Function {
     pub fn new(name: Token, body: String) -> Function {
-        Function { name, docstring: None, body, decorators: Vec::new() }
+        Function {
+            name,
+            docstring: None,
+            body,
+            decorators: Vec::new(),
+        }
     }
 
     pub fn set_docstring(&mut self, docstring: Docstring) {
@@ -35,12 +40,13 @@ impl Function {
         Ok(())
     }
 
-    pub fn add_documented_argument(&mut self, doc_arg: DocArg) -> Result<(), String>{
+    pub fn add_documented_argument(&mut self, doc_arg: DocArg) -> Result<(), String> {
         if self.docstring.is_none() {
             return Err(concat!(
                 "Cannot add a documented argument to a function without a docstring. ",
                 "First set the docstring summary using `set_docstring_summary`."
-            ).to_string());
+            )
+            .to_string());
         }
 
         if let Some(docstring) = &mut self.docstring {
@@ -51,7 +57,10 @@ impl Function {
 
     pub fn add_decorator(&mut self, decorator: Decorator) -> Result<(), String> {
         if self.decorators.contains(&decorator) {
-            return Err(format!("The function already has the decorator `{}`.", decorator));
+            return Err(format!(
+                "The function already has the decorator `{}`.",
+                decorator
+            ));
         }
 
         self.decorators.push(decorator);
@@ -89,9 +98,13 @@ impl Display for Function {
                 write!(f, "{}", last_doc_arg.arg())?;
             }
         }
-        
+
         write!(f, ")")?;
-        if let Some(returns) = &self.docstring.as_ref().and_then(|docstring: &Docstring| -> Option<DocArg> {docstring.returns().clone()}) {
+        if let Some(returns) = &self
+            .docstring
+            .as_ref()
+            .and_then(|docstring: &Docstring| -> Option<DocArg> { docstring.returns().clone() })
+        {
             write!(f, " -> {}", returns.arg())?;
         }
         write!(f, ":\n")?;
